@@ -158,9 +158,10 @@
        (label "Reset")
        (callback
         (lambda (b e)
-          (send planet-container kill)
+                 (send planet-container kill)
           (send planet-container reset)
-          (send canvas refresh)))))
+          
+          (cond (thread-dead? animate) (animate))))))
 ;;;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;
 (define kill-checkbox
   (new button%
@@ -169,8 +170,7 @@
        (callback 
         (lambda (button event)
                (kill-thread animate) 
-               (send planet-container kill)
-               (exit (exit-handler))))))
+               (send planet-container kill)))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define my-canvas%
   (class canvas%
