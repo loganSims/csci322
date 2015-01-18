@@ -122,7 +122,16 @@
 (define planet-container (new planet-container%))
     
 ;; The GUI
-(define frame (new frame% 
+;;;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;
+(define my-frame%
+  (class frame%
+    (define (on-close)
+      (displayln "Closing the window!"))
+    (augment on-close)
+    (super-new)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define frame (new my-frame% 
                    (label "Planets")
                    (min-width 120)
                    (min-height 80)
@@ -161,17 +170,7 @@
           (send planet-container kill)
           (send planet-container reset)
           (send canvas refresh)))))
-;;;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;
-(define kill-checkbox
-  (new button%
-       (parent h-panel)
-       (label "Kill")
-       (callback 
-        (lambda (button event)
-               (kill-thread animate) 
-               (send planet-container kill)
-               (exit (exit-handler))))))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (define my-canvas%
   (class canvas%
     (override on-paint on-event)
@@ -212,7 +211,6 @@
    (lambda ()
      (let loop ()
        (send canvas refresh)
-       ;(yield)
        (sleep .05)
        (loop)))))
 (thread-suspend animate)

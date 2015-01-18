@@ -93,7 +93,16 @@
 (define planet-container (new planet-container%))
     
 ;; The GUI
-(define frame (new frame% 
+;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define my-frame%
+  (class frame%
+    (define (on-close)
+      (displayln "Closing the window!")
+    )
+    (augment on-close)
+    (super-new)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define frame (new my-frame% 
                    (label "Planets")
                    (min-width 120)
                    (min-height 80)
@@ -127,17 +136,6 @@
        (callback
         (lambda (b e)
           (send planet-container reset)))))
-
-;;;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;
-(define kill-checkbox
-  (new button%
-       (parent h-panel)
-       (label "Kill")
-       (callback 
-        (lambda (button event)
-               (kill-thread animate) 
-               (exit (exit-handler))))))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define my-canvas%
   (class canvas%
