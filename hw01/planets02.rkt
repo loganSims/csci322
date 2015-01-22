@@ -126,7 +126,8 @@
 (define my-frame%
   (class frame%
     (define (on-close)
-      (displayln "Closing the window!"))
+      (send planet-container kill)
+      (kill-thread animate))
     (augment on-close)
     (super-new)))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

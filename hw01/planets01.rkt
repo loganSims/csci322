@@ -97,8 +97,7 @@
 (define my-frame%
   (class frame%
     (define (on-close)
-      (displayln "Closing the window!")
-    )
+      (kill-thread animate))
     (augment on-close)
     (super-new)))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
