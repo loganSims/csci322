@@ -10,6 +10,14 @@
 
 (require racket/gui)
 
+;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;
+(define turnstile1 (make-semaphore 0))
+(define turnstile2 (make-semaphore 1))
+(define mutex (make-semaphore 1))
+(define counter 0)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 ;; Small 2d vector library for the Newtonian physics
 (define (x v) (vector-ref v 0))
 (define (y v) (vector-ref v 1))
@@ -35,9 +43,31 @@
                 (t (thread
                      (lambda ()
                        (let loop ()
-                          (calculate-force (send planet-container get-planets))
-                          (move)
-                          (sleep .05)
+;Want all planets to calculate force before they can (move)  
+                         (semaphore-wait mutex) 
+                         (set! counter (+ counter 1))
+                         (cond ((= counter (send planet-container num-planets))
+                                    (semaphore-wait turnstile2)
+                                    (semaphore-post turnstile1)))
+                         (semaphore-post mutex)
+                         
+                         (semaphore-wait turnstile1)
+                         (semaphore-post turnstile1)
+                         ;critical point!
+                         (calculate-force (send planet-container get-planets))
+                         
+                         (semaphore-wait mutex) 
+                         (set! counter (- counter 1))
+                         (cond ((= counter 0)
+                                    (semaphore-wait turnstile1)
+                                    (semaphore-post turnstile2)))
+                         (semaphore-post mutex)
+                         
+                         (semaphore-wait turnstile2)
+                         (semaphore-post turnstile2)
+                         (move)
+                         
+                         (sleep .05)
                        (loop))))))
     (thread-suspend t)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -85,13 +115,14 @@
 ;; Abstract the list-handling for a list of planets
 (define planet-container%
   (class object%
-    (public add-planet calculate-force move draw get-planets reset resume suspend kill)
+    (public add-planet calculate-force move draw get-planets reset resume suspend kill num-planets)
     (init-field (planets '()))
     (define (get-planets) planets)
     (define (reset) (set! planets '()))
     (define (add-planet planet)
       (set! planets (cons planet planets)))
 ;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    (define (num-planets) (length planets))
 ;control functions for planet threads    
     (define (suspend)
       (for-each (lambda (planet)
@@ -177,6 +208,7 @@
         (lambda (b e)
           (send planet-container kill)
           (send planet-container reset)
+          (set! counter 0)
           (send canvas refresh)))))
 
 (define my-canvas%
