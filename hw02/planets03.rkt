@@ -2,6 +2,11 @@
 ;; Geoffrey Matthews
 ;; 2013
 ;; A non-threaded planet demo
+;;;;;;;;;;;;;;;;;;;;
+;;Edits: Logan Sims
+;;CSCI 322
+;;Winter 2015      
+;;;;;;;;;;;;;;;;;;;;
 
 (require racket/gui)
 
@@ -24,7 +29,18 @@
     (init-field (mass 1)
                 (position (vector 0 0 ))
                 (velocity (vector 0 0 ))
-                (force (vector 0 0 )))
+                (force (vector 0 0 ))
+;;;;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;
+;a control thread is now a feild of each planet
+                (t (thread
+                     (lambda ()
+                       (let loop ()
+                          (calculate-force (send planet-container get-planets))
+                          (move)
+                          (sleep .05)
+                       (loop))))))
+    (thread-suspend t)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (define (m) mass)
     (define (p) position)
     (define (v) velocity)
@@ -69,12 +85,30 @@
 ;; Abstract the list-handling for a list of planets
 (define planet-container%
   (class object%
-    (public add-planet calculate-force move draw get-planets reset)
+    (public add-planet calculate-force move draw get-planets reset resume suspend kill)
     (init-field (planets '()))
     (define (get-planets) planets)
     (define (reset) (set! planets '()))
     (define (add-planet planet)
       (set! planets (cons planet planets)))
+;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;control functions for planet threads    
+    (define (suspend)
+      (for-each (lambda (planet)
+                  (thread-suspend (get-field t planet)))
+                planets))
+    
+    (define (resume)
+      (for-each (lambda (planet)
+                  (thread-resume (get-field t planet)))
+                planets))
+    
+    (define (kill)
+      (for-each (lambda (planet)
+                  (kill-thread (get-field t planet))
+                  (remv planet planets))
+                planets))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (define (calculate-force)
       (for-each (lambda (planet)
                   (send planet calculate-force planets))
@@ -93,14 +127,17 @@
 (define planet-container (new planet-container%))
     
 ;; The GUI
-;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;
+;kills animate and all planet threads
 (define my-frame%
   (class frame%
     (define (on-close)
+      (send planet-container kill)
       (kill-thread animate))
     (augment on-close)
     (super-new)))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (define frame (new my-frame% 
                    (label "Planets")
                    (min-width 120)
@@ -120,26 +157,31 @@
   (new check-box%
        (parent h-panel)
        (label "Run animation")
-;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;
+;suspends/resumes animate thread and all planet threads
+       ;callback instead of busy loop
        (callback 
         (lambda (button event)
           (cond((send run-checkbox get-value)
-               (thread-resume animate))
+               (thread-resume animate) 
+               (send planet-container resume))
           (else 
-               (thread-suspend animate)))))))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+               (thread-suspend animate)
+               (send planet-container suspend)))))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define reset-button
   (new button%
        (parent h-panel)
        (label "Reset")
        (callback
         (lambda (b e)
-          (send planet-container reset)))))
+          (send planet-container kill)
+          (send planet-container reset)
+          (send canvas refresh)))))
 
 (define my-canvas%
   (class canvas%
     (override on-paint on-event)
-    
     (define (on-paint)
       (let ((dc (send this get-dc))
             (w (send this get-width))
@@ -153,6 +195,11 @@
               (y (send event get-y)))
           (send frame set-status-text (format "Mouse at ~a ~a" x y))
           (send planet-container add-planet (new planet% (position (vector x y))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          ;checks if planet should be resumed when it is created
+          (cond((send run-checkbox get-value)
+               (send planet-container resume)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           (send this refresh)))
       )
     (super-new)
@@ -166,16 +213,14 @@
        (min-width 640)
        (min-height 480)))
 
-;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;;;;
+;animate thread instead of busy loop
 (define animate
- (thread
+ (thread  
    (lambda ()
      (let loop ()
-       (send planet-container calculate-force)
-       (send planet-container move)
        (send canvas refresh)
        (sleep .05)
-     (loop)))))
-
+       (loop)))))
 (thread-suspend animate)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
