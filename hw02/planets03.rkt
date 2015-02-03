@@ -53,7 +53,7 @@
                          
                          (semaphore-wait turnstile1)
                          (semaphore-post turnstile1)
-                         ;critical point!
+                         ;critical point1!
                          (calculate-force (send planet-container get-planets))
                          
                          (semaphore-wait mutex) 
@@ -65,8 +65,8 @@
                          
                          (semaphore-wait turnstile2)
                          (semaphore-post turnstile2)
+                         ;critical point2!
                          (move)
-                         
                          (sleep .05)
                        (loop))))))
     (thread-suspend t)

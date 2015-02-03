@@ -15,6 +15,7 @@
 (define turnstile2 (make-semaphore 1))
 (define mutex (make-semaphore 1))
 (define counter 0)
+(define moveRoomEmpty (make-semaphore 1))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -48,25 +49,29 @@
                          (set! counter (+ counter 1))
                          (cond ((= counter (send planet-container num-planets))
                                     (semaphore-wait turnstile2)
+                                    (semaphore-post moveRoomEmpty);unlocks room so screen can refresh
                                     (semaphore-post turnstile1)))
                          (semaphore-post mutex)
                          
                          (semaphore-wait turnstile1)
                          (semaphore-post turnstile1)
-                         ;critical point!
+                         
+                         ;critical point
                          (calculate-force (send planet-container get-planets))
                          
                          (semaphore-wait mutex) 
                          (set! counter (- counter 1))
                          (cond ((= counter 0)
                                     (semaphore-wait turnstile1)
+                                    (semaphore-wait moveRoomEmpty);locks room while planets move
                                     (semaphore-post turnstile2)))
                          (semaphore-post mutex)
                          
                          (semaphore-wait turnstile2)
                          (semaphore-post turnstile2)
+                         ;critical point
                          (move)
-                         
+ 
                          (sleep .05)
                        (loop))))))
     (thread-suspend t)
@@ -251,7 +256,11 @@
  (thread  
    (lambda ()
      (let loop ()
+       
+       (semaphore-wait moveRoomEmpty)
        (send canvas refresh)
+       (semaphore-post moveRoomEmpty)
+       
        (sleep .05)
        (loop)))))
 (thread-suspend animate)
