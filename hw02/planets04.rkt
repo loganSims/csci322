@@ -11,10 +11,11 @@
 (require racket/gui)
 
 ;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;
-(define turnstile1 (make-semaphore 0))
-(define turnstile2 (make-semaphore 1))
+(define turnstileCalc (make-semaphore 0))
+(define turnstileMove (make-semaphore 1))
 (define mutex (make-semaphore 1))
 (define counter 0)
+;semaphore for screen refresh, acts as a mutex
 (define moveRoomEmpty (make-semaphore 1))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -44,17 +45,29 @@
                 (t (thread
                      (lambda ()
                        (let loop ()
-;Want all planets to calculate force before they can (move)  
+                         ;all planets calculate force before they can move.
+
+                         ;once all planets have finished calculating force, 
+                         ;turnstileCalc gets locked, and turnstileMove gets unlocked
+                         ;planets will then move and wait at turnstileMove until the last has
+                         ;finished, then the process will repeat with turnstileMove being locked
+                         ;and turnstileCalc being unlocked
+                     
+                         ;the semaphore moveRoomEmpty acts as a mutex and gets unlocked
+                         ;after the last planets has finished moving and turnstileMOve has been locked.
+                         ;moveRoomEmpty is locked as soon as the last planet finishes calculating force.
+                         ;This all ensures that the screen will not refresh while planets are moving 
+                         
                          (semaphore-wait mutex) 
                          (set! counter (+ counter 1))
                          (cond ((= counter (send planet-container num-planets))
-                                    (semaphore-wait turnstile2)
+                                    (semaphore-wait turnstileMove)
                                     (semaphore-post moveRoomEmpty);unlocks room so screen can refresh
-                                    (semaphore-post turnstile1)))
+                                    (semaphore-post turnstileCalc)))
                          (semaphore-post mutex)
                          
-                         (semaphore-wait turnstile1)
-                         (semaphore-post turnstile1)
+                         (semaphore-wait turnstileCalc)
+                         (semaphore-post turnstileCalc)
                          
                          ;critical point
                          (calculate-force (send planet-container get-planets))
@@ -62,13 +75,13 @@
                          (semaphore-wait mutex) 
                          (set! counter (- counter 1))
                          (cond ((= counter 0)
-                                    (semaphore-wait turnstile1)
+                                    (semaphore-wait turnstileCalc)
                                     (semaphore-wait moveRoomEmpty);locks room while planets move
-                                    (semaphore-post turnstile2)))
+                                    (semaphore-post turnstileMove)))
                          (semaphore-post mutex)
                          
-                         (semaphore-wait turnstile2)
-                         (semaphore-post turnstile2)
+                         (semaphore-wait turnstileMove)
+                         (semaphore-post turnstileMove)
                          ;critical point
                          (move)
  
@@ -252,11 +265,14 @@
 
 ;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;;;;
 ;animate thread instead of busy loop
+;animate thread cannot refresh while the move critical point has
+;the key (moveRoomEmpty is set to 0)
+;refer to barrier above for how moveRoomEmpty gets "locked"
 (define animate
  (thread  
    (lambda ()
      (let loop ()
-       
+
        (semaphore-wait moveRoomEmpty)
        (send canvas refresh)
        (semaphore-post moveRoomEmpty)
@@ -265,3 +281,4 @@
        (loop)))))
 (thread-suspend animate)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

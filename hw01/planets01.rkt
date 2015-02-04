@@ -5,17 +5,10 @@
 ;;;;;;;;;;;;;;;;;;;;
 ;;Edits: Logan Sims
 ;;CSCI 322
-;;Winter 2015 
+;;Winter 2015      
 ;;;;;;;;;;;;;;;;;;;;
+
 (require racket/gui)
-
-;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;
-(define turnstileCalc (make-semaphore 0))
-(define turnstileMove (make-semaphore 1))
-(define mutex (make-semaphore 1))
-(define counter 0)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ;; Small 2d vector library for the Newtonian physics
 (define (x v) (vector-ref v 0))
@@ -36,46 +29,7 @@
     (init-field (mass 1)
                 (position (vector 0 0 ))
                 (velocity (vector 0 0 ))
-                (force (vector 0 0 ))
-;;;;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;
-;a control thread is now a feild of each planet
-                (t (thread
-                     (lambda ()
-                       (let loop ()
-                         ;all planets calculate force before they can move.
-
-                         ;once all planets have finished calculating force, 
-                         ;turnstileCalc gets locked, and turnstileMove gets unlocked
-                         ;planets will then move and wait at turnstileMove until the last has
-                         ;finished, then the process will repeat with turnstileMove being locked
-                         ;and turnstileCalc being unlocked  
-                         (semaphore-wait mutex) 
-                         (set! counter (+ counter 1))
-                         (cond ((= counter (send planet-container num-planets))
-                                    (semaphore-wait turnstileMove)
-                                    (semaphore-post turnstileCalc)))
-                         (semaphore-post mutex)
-                         
-                         (semaphore-wait turnstileCalc)
-                         (semaphore-post turnstileCalc)
-                         ;critical point1!
-                         (calculate-force (send planet-container get-planets))
-                         
-                         (semaphore-wait mutex) 
-                         (set! counter (- counter 1))
-                         (cond ((= counter 0)
-                                    (semaphore-wait turnstileCalc)
-                                    (semaphore-post turnstileMove)))
-                         (semaphore-post mutex)
-                         
-                         (semaphore-wait turnstileMove)
-                         (semaphore-post turnstileMove)
-                         ;critical point2!
-                         (move)
-                         (sleep .05)
-                       (loop))))))
-    (thread-suspend t)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                (force (vector 0 0 )))
     (define (m) mass)
     (define (p) position)
     (define (v) velocity)
@@ -120,31 +74,12 @@
 ;; Abstract the list-handling for a list of planets
 (define planet-container%
   (class object%
-    (public add-planet calculate-force move draw get-planets reset resume suspend kill num-planets)
+    (public add-planet calculate-force move draw get-planets reset)
     (init-field (planets '()))
     (define (get-planets) planets)
     (define (reset) (set! planets '()))
     (define (add-planet planet)
       (set! planets (cons planet planets)))
-;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (define (num-planets) (length planets))
-;control functions for planet threads    
-    (define (suspend)
-      (for-each (lambda (planet)
-                  (thread-suspend (get-field t planet)))
-                planets))
-    
-    (define (resume)
-      (for-each (lambda (planet)
-                  (thread-resume (get-field t planet)))
-                planets))
-    
-    (define (kill)
-      (for-each (lambda (planet)
-                  (kill-thread (get-field t planet))
-                  (remv planet planets))
-                planets))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (define (calculate-force)
       (for-each (lambda (planet)
                   (send planet calculate-force planets))
@@ -163,17 +98,15 @@
 (define planet-container (new planet-container%))
     
 ;; The GUI
-;;;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;
-;kills animate and all planet threads
+;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;;;;;;;;
+;Kills all threads when window closed
 (define my-frame%
   (class frame%
     (define (on-close)
-      (send planet-container kill)
       (kill-thread animate))
     (augment on-close)
     (super-new)))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define frame (new my-frame% 
                    (label "Planets")
                    (min-width 120)
@@ -193,32 +126,27 @@
   (new check-box%
        (parent h-panel)
        (label "Run animation")
-;;;;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;
-;suspends/resumes animate thread and all planet threads
-       ;callback instead of busy loop
+;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;
+;suspends/resumes thread instead of busy waiting 
        (callback 
         (lambda (button event)
           (cond((send run-checkbox get-value)
-               (thread-resume animate) 
-               (send planet-container resume))
+               (thread-resume animate))
           (else 
-               (thread-suspend animate)
-               (send planet-container suspend)))))))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+               (thread-suspend animate)))))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define reset-button
   (new button%
        (parent h-panel)
        (label "Reset")
        (callback
         (lambda (b e)
-          (send planet-container kill)
-          (send planet-container reset)
-          (set! counter 0)
-          (send canvas refresh)))))
+          (send planet-container reset)))))
 
 (define my-canvas%
   (class canvas%
     (override on-paint on-event)
+    
     (define (on-paint)
       (let ((dc (send this get-dc))
             (w (send this get-width))
@@ -232,11 +160,6 @@
               (y (send event get-y)))
           (send frame set-status-text (format "Mouse at ~a ~a" x y))
           (send planet-container add-planet (new planet% (position (vector x y))))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-          ;checks if planet should be resumed when it is created
-          (cond((send run-checkbox get-value)
-               (send planet-container resume)))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           (send this refresh)))
       )
     (super-new)
@@ -250,14 +173,17 @@
        (min-width 640)
        (min-height 480)))
 
-;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;;;;
-;animate thread instead of busy loop
+;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;;
+;Now has a thread that can be paused and resumed
 (define animate
- (thread  
+ (thread
    (lambda ()
      (let loop ()
+       (send planet-container calculate-force)
+       (send planet-container move)
        (send canvas refresh)
        (sleep .05)
-       (loop)))))
+     (loop)))))
+
 (thread-suspend animate)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -5,13 +5,14 @@
 ;;;;;;;;;;;;;;;;;;;;
 ;;Edits: Logan Sims
 ;;CSCI 322
-;;Winter 2015 
+;;Winter 2015      
 ;;;;;;;;;;;;;;;;;;;;
+
 (require racket/gui)
 
 ;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;
-(define turnstileCalc (make-semaphore 0))
-(define turnstileMove (make-semaphore 1))
+(define turnstile1 (make-semaphore 0))
+(define turnstile2 (make-semaphore 1))
 (define mutex (make-semaphore 1))
 (define counter 0)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -42,36 +43,30 @@
                 (t (thread
                      (lambda ()
                        (let loop ()
-                         ;all planets calculate force before they can move.
-
-                         ;once all planets have finished calculating force, 
-                         ;turnstileCalc gets locked, and turnstileMove gets unlocked
-                         ;planets will then move and wait at turnstileMove until the last has
-                         ;finished, then the process will repeat with turnstileMove being locked
-                         ;and turnstileCalc being unlocked  
+;Want all planets to calculate force before they can (move)  
                          (semaphore-wait mutex) 
                          (set! counter (+ counter 1))
                          (cond ((= counter (send planet-container num-planets))
-                                    (semaphore-wait turnstileMove)
-                                    (semaphore-post turnstileCalc)))
+                                    (semaphore-wait turnstile2)
+                                    (semaphore-post turnstile1)))
                          (semaphore-post mutex)
                          
-                         (semaphore-wait turnstileCalc)
-                         (semaphore-post turnstileCalc)
-                         ;critical point1!
+                         (semaphore-wait turnstile1)
+                         (semaphore-post turnstile1)
+                         ;critical point!
                          (calculate-force (send planet-container get-planets))
                          
                          (semaphore-wait mutex) 
                          (set! counter (- counter 1))
                          (cond ((= counter 0)
-                                    (semaphore-wait turnstileCalc)
-                                    (semaphore-post turnstileMove)))
+                                    (semaphore-wait turnstile1)
+                                    (semaphore-post turnstile2)))
                          (semaphore-post mutex)
                          
-                         (semaphore-wait turnstileMove)
-                         (semaphore-post turnstileMove)
-                         ;critical point2!
+                         (semaphore-wait turnstile2)
+                         (semaphore-post turnstile2)
                          (move)
+                         
                          (sleep .05)
                        (loop))))))
     (thread-suspend t)

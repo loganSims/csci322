@@ -5,17 +5,10 @@
 ;;;;;;;;;;;;;;;;;;;;
 ;;Edits: Logan Sims
 ;;CSCI 322
-;;Winter 2015 
+;;Winter 2015      
 ;;;;;;;;;;;;;;;;;;;;
+
 (require racket/gui)
-
-;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;
-(define turnstileCalc (make-semaphore 0))
-(define turnstileMove (make-semaphore 1))
-(define mutex (make-semaphore 1))
-(define counter 0)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ;; Small 2d vector library for the Newtonian physics
 (define (x v) (vector-ref v 0))
@@ -42,37 +35,9 @@
                 (t (thread
                      (lambda ()
                        (let loop ()
-                         ;all planets calculate force before they can move.
-
-                         ;once all planets have finished calculating force, 
-                         ;turnstileCalc gets locked, and turnstileMove gets unlocked
-                         ;planets will then move and wait at turnstileMove until the last has
-                         ;finished, then the process will repeat with turnstileMove being locked
-                         ;and turnstileCalc being unlocked  
-                         (semaphore-wait mutex) 
-                         (set! counter (+ counter 1))
-                         (cond ((= counter (send planet-container num-planets))
-                                    (semaphore-wait turnstileMove)
-                                    (semaphore-post turnstileCalc)))
-                         (semaphore-post mutex)
-                         
-                         (semaphore-wait turnstileCalc)
-                         (semaphore-post turnstileCalc)
-                         ;critical point1!
-                         (calculate-force (send planet-container get-planets))
-                         
-                         (semaphore-wait mutex) 
-                         (set! counter (- counter 1))
-                         (cond ((= counter 0)
-                                    (semaphore-wait turnstileCalc)
-                                    (semaphore-post turnstileMove)))
-                         (semaphore-post mutex)
-                         
-                         (semaphore-wait turnstileMove)
-                         (semaphore-post turnstileMove)
-                         ;critical point2!
-                         (move)
-                         (sleep .05)
+                          (calculate-force (send planet-container get-planets))
+                          (move)
+                          (sleep .05)
                        (loop))))))
     (thread-suspend t)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -120,14 +85,13 @@
 ;; Abstract the list-handling for a list of planets
 (define planet-container%
   (class object%
-    (public add-planet calculate-force move draw get-planets reset resume suspend kill num-planets)
+    (public add-planet calculate-force move draw get-planets reset resume suspend kill)
     (init-field (planets '()))
     (define (get-planets) planets)
     (define (reset) (set! planets '()))
     (define (add-planet planet)
       (set! planets (cons planet planets)))
 ;;;;;;;;;;;;;;;;;;;added code;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    (define (num-planets) (length planets))
 ;control functions for planet threads    
     (define (suspend)
       (for-each (lambda (planet)
@@ -213,7 +177,6 @@
         (lambda (b e)
           (send planet-container kill)
           (send planet-container reset)
-          (set! counter 0)
           (send canvas refresh)))))
 
 (define my-canvas%
