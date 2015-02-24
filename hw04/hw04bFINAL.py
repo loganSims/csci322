@@ -5,6 +5,8 @@
 #
 # Using a FIFO queue tries to solve the
 # dining philosophers problem with no starvation.
+# the first philosopher in the queue is given many
+# chances to start eating
 #
 ##############################################
 
