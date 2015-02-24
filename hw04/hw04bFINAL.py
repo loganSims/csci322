@@ -1,3 +1,13 @@
+#############################################
+#
+# Logan Sims
+# hw04: part b
+#
+# Using a FIFO queue tries to solve the
+# dining philosophers problem with no starvation.
+#
+##############################################
+
 import threading, time, random, os, collections
 
 #Class from downey
@@ -21,9 +31,7 @@ waiting = []
 
 queue = collections.deque()
 baton = Semaphore(1)
-delay = Semaphore(0)
 total = 0
-justAte = -1
 
 #main function
 def main(n):
@@ -62,11 +70,9 @@ def philo(n):
 	os._exit(0)
 
 #function for checking assertion
-def check(left, right, n, justAte, eating):
+def check(left, right, n, eating):
 
 	if (((eating[left]) or (eating[right])) and (eating[n])):
-		print "ERROR"
-	if(eating[n] and (justAte == n)):
 		print "ERROR"
 
 #called when thread has baton and needs to pass it on
@@ -90,17 +96,17 @@ def dine(n, left, right):
 	global waiting
 	global total
 	global queue
-	global justAte
 
 	#Think
 	time.sleep(random.random())
 
-	check(left, right, n, justAte, eating)
+	check(left, right, n, eating)
 
+	#enter mutex
 	baton.wait()
-	check(left, right, n, justAte, eating)
+	check(left, right, n, eating)
 
-	if ((eating[left]) or (eating[right]) or (justAte == n)):
+	if ((eating[left]) or (eating[right])):
 		waiting[n] = True
 		#enter FIFO queue
 		queue.append(n)
@@ -110,7 +116,7 @@ def dine(n, left, right):
 			philos[n].wait()
 			#put self back in front queue
 			queue.appendleft(n)			
-			if ((not eating[left]) and (not eating[right]) and (justAte != n)):
+			if ((not eating[left]) and (not eating[right])):
 				waiting[n] = False
 				eating[n] = True
 				#remove self from queue
@@ -121,24 +127,25 @@ def dine(n, left, right):
 	else:
 		eating[n] = True
 		print(str(n) + " is eating")
-		SIGNAL()
+		SIGNAL() #pass baton
 
-	check(left, right, n, justAte, eating)
+	#exited mutex
+
+	check(left, right, n, eating)
 
 	#eat
 	time.sleep(random.random())
 
+	#enter mutex
 	baton.wait()
-	justAte = n
-	hasBaton = True
 	eating[n] = False
 	print(str(n) + " is done eating")	
 
-	check(left, right, n, justAte, eating)
-
-	SIGNAL()
+	check(left, right, n, eating)
 	
-	check(left, right, n, justAte, eating)
+	SIGNAL() #pass baton
+	
+	check(left, right, n, eating)
 
-#start
+#Change num philos here
 main(5)

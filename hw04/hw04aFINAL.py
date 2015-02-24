@@ -1,3 +1,12 @@
+#############################################
+#
+# Logan Sims
+# hw04: part a
+#
+# Solves the dining philosophers 
+# problem without addressing possible starvation.
+#
+##############################################
 import threading, time, random, os
 
 #Class from downey
@@ -18,12 +27,10 @@ philos = []
 waiting = []
 
 baton = Semaphore(1)
-delay = Semaphore(0)
 total = 0
 
 #main function
 def main(n):
-	global total
 	global waiting
 	global eating 
 	global philos
@@ -68,12 +75,14 @@ def dine(n, left, right):
 	global baton
 	global philos
 	global waiting
-	global total
 	hasBaton = False
 
+	#think
 	time.sleep(random.random())
 
 	check(left, right, n)
+
+	#enter baton mutex
 	baton.wait()
 
 	check(left, right, n)
@@ -93,10 +102,14 @@ def dine(n, left, right):
 		print(str(n) + " is eating")
 		baton.signal()			
 
+	#exit of baton mutex
+
 	check(left, right, n)
 
+	#eat
 	time.sleep(random.random())
 
+	#enter baton mutex
 	baton.wait()
 	hasBaton = True
 	eating[n] = False
@@ -104,7 +117,8 @@ def dine(n, left, right):
 
 	check(left, right, n)
 
-	#give baton to lowest index waiting philo
+	#pass baton
+	#gives baton to lowest index waiting philo
 	for i in range (0, total):
 		if (waiting[i]):
 			philos[i].signal()
