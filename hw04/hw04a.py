@@ -1,16 +1,13 @@
 #############################################
 #
 # Logan Sims
-# hw04: part b
+# hw04: part a
 #
-# Using a FIFO queue tries to solve the
-# dining philosophers problem with no starvation.
-# the first philosopher in the queue is given many
-# chances to start eating
+# Solves the dining philosophers 
+# problem without addressing possible starvation.
 #
 ##############################################
-
-import threading, time, random, os, collections
+import threading, time, random, os
 
 #Class from downey
 class Semaphore(threading._Semaphore):
@@ -22,8 +19,6 @@ class Thread(threading.Thread):
 		threading.Thread.__init__(self, target=t, args=args)
 		self.start()
 
-#declare global array for threads
-
 #boolean array, n true if philo n is eating
 eating = []
 #sema array that phlio n waits on for a fork
@@ -31,13 +26,11 @@ philos = []
 #boolean array, index n is true if philo n is waiting
 waiting = []
 
-queue = collections.deque()
 baton = Semaphore(1)
 total = 0
 
 #main function
 def main(n):
-	global total
 	global waiting
 	global eating 
 	global philos
@@ -65,89 +58,77 @@ def philo(n):
 		right = 0
 	else:
 		right = n+1
-	i = 0
+
 	while (True):          
 		dine(n, left, right)
-		i = i + 1
+
 	os._exit(0)
 
 #function for checking assertion
-def check(left, right, n, eating):
-
+def check(left, right, n):
+	global eating
 	if (((eating[left]) or (eating[right])) and (eating[n])):
 		print "ERROR"
-
-#called when thread has baton and needs to pass it on
-def SIGNAL():
-	global queue
-	global philos
-	global baton
-
-	hasBaton = True
-
-	if (len(queue) > 0):
-		philos[queue.popleft()].signal()
-		hasBaton = False
-	if (hasBaton):
-		baton.signal()		
 
 def dine(n, left, right):
 	global eating	
 	global baton
 	global philos
 	global waiting
-	global total
-	global queue
+	hasBaton = False
 
-	#Think
+	#think
 	time.sleep(random.random())
 
-	check(left, right, n, eating)
+	check(left, right, n)
 
-	#enter mutex
+	#enter baton mutex
 	baton.wait()
-	check(left, right, n, eating)
+
+	check(left, right, n)
 
 	if ((eating[left]) or (eating[right])):
 		waiting[n] = True
-		#enter FIFO queue
-		queue.append(n)
-		#print(str(n) + " has entered queue")
 		baton.signal()
 		while (waiting[n]):
 			philos[n].wait()
-			#put self back in front queue
-			queue.appendleft(n)			
 			if ((not eating[left]) and (not eating[right])):
 				waiting[n] = False
 				eating[n] = True
-				#remove self from queue
-				queue.popleft()
-				#print(str(n) + " has left queue")
-				print(str(n) + " is eating")
+				#print(str(n) + " is eating")
 			baton.signal()
 	else:
 		eating[n] = True
-		print(str(n) + " is eating")
-		SIGNAL() #pass baton
+		#print(str(n) + " is eating")
+		baton.signal()			
 
-	#exited mutex
+	#exit of baton mutex
 
-	check(left, right, n, eating)
+	check(left, right, n)
 
 	#eat
 	time.sleep(random.random())
 
-	#enter mutex
+	#enter baton mutex
 	baton.wait()
+	hasBaton = True
 	eating[n] = False
-	print(str(n) + " is done eating")	
+	#print(str(n) + " is done eating")	
 
-	check(left, right, n, eating)
-	
-	SIGNAL() #pass baton
-	
-	check(left, right, n, eating)
+	check(left, right, n)
 
-#Change num philos here
+	#pass baton
+	#gives baton to lowest index waiting philo
+	for i in range (0, total):
+		if (waiting[i]):
+			philos[i].signal()
+			hasBaton = False
+			break
+	if (hasBaton):
+		baton.signal()	
+		hasBaton = False	
+	
+	check(left, right, n)
+
+#start
 main(5)
