@@ -1,0 +1,14 @@
+#lang racket
+(define A-channel (make-channel))
+(define B-channel (make-channel))
+
+(define A-arrive (lambda ()
+   ;wait for a signal from two Bs
+   (channel-put B-channel #t)
+   (channel-get B-channel) 
+   (channel-get B-channel)))
+
+(define B-arrive (lambda ()
+   ;wait for a signal from one A
+   (channel-get B-channel)
+   (channel-put A-channel #t)))
