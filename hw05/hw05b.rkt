@@ -1,14 +1,27 @@
 #lang racket
-;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;Logan Sims
 ;;03/01/2015
-;;hw05 a
+;;hw05 b
 ;;
+;;Server process that controls A and B threads.
+;;One A thread can continue only after it has "seen"
+;;two B threads. One B thread can continue only after
+;;it has "seen" one A thread and the A thread has "seen"
+;;two B threads
 ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;
-(define A-channel (make-channel))
-(define B-channel (make-channel))
+;;To "see" means they have successful sent/received the
+;;others message
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;used for stopping program
 (define count 0)
+
+;Server Process;;;;;;;;;;;;;;;;;;;;;
+;Channel A gets B arrive message from
+(define A-channel (make-channel))
+;Channel that A uses to tell B's they can go
+(define B-channel (make-channel))
 
 (define A-arrive (lambda ()
    (channel-get A-channel) 
@@ -19,7 +32,10 @@
 (define B-arrive (lambda ()
    (channel-put A-channel #t)
    (channel-get B-channel)))
+;End Server Process;;;;;;;;;;;;;;;;;;
 
+
+;start A thread
 (define thread-A
 (thread
   (lambda ()
@@ -30,6 +46,7 @@
               (set! count (+ count 1))
               (loop)))))
 
+;start B1 thread
 (define thread-B1
 (thread
   (lambda ()
@@ -38,7 +55,7 @@
               (B-arrive)
               (displayln "B1 passes")
               (loop)))))
-
+;Start B2 thread
 (define thread-B2
 (thread
   (lambda ()
@@ -49,11 +66,14 @@
               (loop)))))
 
 ;main loop 
-;stops program after A recives a certain number
-;of messages
+;stops program after A receives n messages
+(define main (lambda (n)
 (let loop ()  
-  (if (equal? count 10) 
+  (if (> count n) 
       (begin (thread-suspend thread-A)
              (thread-suspend thread-B1)
              (thread-suspend thread-B2)) 
-      (loop)))
+      (loop)))))
+
+(main 1000)
+

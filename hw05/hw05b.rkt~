@@ -1,16 +1,40 @@
 #lang racket
-(define channel (make-channel))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;Logan Sims
+;;03/01/2015
+;;hw05 b
+;;
+;;Server process that controls A and B threads.
+;;One A thread can continue only after it has "seen"
+;;two B threads. One B thread can continue only after
+;;it has "seen" one A thread
+;;
+;;To "see" means they have successful sent/received the
+;;others message
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;used for stopping program
 (define count 0)
 
+;Server Process;;;;;;;;;;;;;;;;;;;;;
+;Channel A gets B arrive message from
+(define A-channel (make-channel))
+;Channel that A uses to tell B's they can go
+(define B-channel (make-channel))
+
 (define A-arrive (lambda ()
-   ;wait for a signal from two Bs
-   (channel-get channel) 
-   (channel-get channel)
-                   ))
+   (channel-get A-channel) 
+   (channel-get A-channel)
+   (channel-put B-channel #t)
+   (channel-put B-channel #t)))
+
 (define B-arrive (lambda ()
-   ;wait for a signal from one A
-   (channel-put channel #t)
-                   ))
+   (channel-put A-channel #t)
+   (channel-get B-channel)))
+;End Server Process;;;;;;;;;;;;;;;;;;
+
+
+;start A thread
 (define thread-A
 (thread
   (lambda ()
@@ -21,6 +45,7 @@
               (set! count (+ count 1))
               (loop)))))
 
+;start B1 thread
 (define thread-B1
 (thread
   (lambda ()
@@ -29,7 +54,7 @@
               (B-arrive)
               (displayln "B1 passes")
               (loop)))))
-
+;Start B2 thread
 (define thread-B2
 (thread
   (lambda ()
@@ -39,19 +64,15 @@
               (displayln "B2 passes")
               (loop)))))
 
-(define thread-B3
-(thread
-  (lambda ()
-            (let loop ()
-              (displayln "B3 arrives")
-              (B-arrive)
-              (displayln "B3 passes")
-              (loop)))))
-
-(let loop ()
-  (if (equal? count 10) 
+;main loop 
+;stops program after A receives n messages
+(define main (lambda (n)
+(let loop ()  
+  (if (> count n) 
       (begin (thread-suspend thread-A)
              (thread-suspend thread-B1)
-             (thread-suspend thread-B2)
-             (thread-suspend thread-B3)) 
-      (loop)))
+             (thread-suspend thread-B2)) 
+      (loop)))))
+
+(main 1000)
+
