@@ -1,20 +1,30 @@
 #lang racket
-(define channel (make-channel))
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;;Logan Sims
+;;03/01/2015
+;;hw05 a
+;;
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+(define A-channel (make-channel))
+(define B-channel (make-channel))
 (define count 0)
 
 (define A-arrive (lambda ()
-   ;wait for a signal from two Bs
-   (channel-get channel) 
-   (channel-get channel)
-                   ))
+   (channel-get A-channel) 
+   (channel-get A-channel)
+   (channel-put B-channel #t)
+   (channel-put B-channel #t)))
+
 (define B-arrive (lambda ()
-   ;wait for a signal from one A
-   (channel-put channel #t)
-                   ))
+   (channel-put A-channel #t)
+   (channel-get B-channel)))
+
 (define thread-A
 (thread
   (lambda ()
             (let loop ()
+              (displayln "A arrives")
               (A-arrive)
               (displayln "A passes")
               (set! count (+ count 1))
@@ -24,6 +34,7 @@
 (thread
   (lambda ()
             (let loop ()
+              (displayln "B1 arrives")
               (B-arrive)
               (displayln "B1 passes")
               (loop)))))
@@ -32,22 +43,17 @@
 (thread
   (lambda ()
             (let loop ()
+              (displayln "B2 arrives")
               (B-arrive)
               (displayln "B2 passes")
               (loop)))))
 
-(define thread-B3
-(thread
-  (lambda ()
-            (let loop ()
-              (B-arrive)
-              (displayln "B3 passes")
-              (loop)))))
-
-(let loop ()
+;main loop 
+;stops program after A recives a certain number
+;of messages
+(let loop ()  
   (if (equal? count 10) 
       (begin (thread-suspend thread-A)
              (thread-suspend thread-B1)
-             (thread-suspend thread-B2)
-             (thread-suspend thread-B3)) 
+             (thread-suspend thread-B2)) 
       (loop)))

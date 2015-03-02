@@ -1,0 +1,57 @@
+#lang racket
+(define channel (make-channel))
+(define count 0)
+
+(define A-arrive (lambda ()
+   ;wait for a signal from two Bs
+   (channel-get channel) 
+   (channel-get channel)
+                   ))
+(define B-arrive (lambda ()
+   ;wait for a signal from one A
+   (channel-put channel #t)
+                   ))
+(define thread-A
+(thread
+  (lambda ()
+            (let loop ()
+              (displayln "A arrives")
+              (A-arrive)
+              (displayln "A passes")
+              (set! count (+ count 1))
+              (loop)))))
+
+(define thread-B1
+(thread
+  (lambda ()
+            (let loop ()
+              (displayln "B1 arrives")
+              (B-arrive)
+              (displayln "B1 passes")
+              (loop)))))
+
+(define thread-B2
+(thread
+  (lambda ()
+            (let loop ()
+              (displayln "B2 arrives")
+              (B-arrive)
+              (displayln "B2 passes")
+              (loop)))))
+
+(define thread-B3
+(thread
+  (lambda ()
+            (let loop ()
+              (displayln "B3 arrives")
+              (B-arrive)
+              (displayln "B3 passes")
+              (loop)))))
+
+(let loop ()
+  (if (equal? count 10) 
+      (begin (thread-suspend thread-A)
+             (thread-suspend thread-B1)
+             (thread-suspend thread-B2)
+             (thread-suspend thread-B3)) 
+      (loop)))
